@@ -1327,6 +1327,15 @@ function closeM(){document.getElementById('mwrap').innerHTML='';}
 
 // ═══ INIT ═════════════════════════════════════════════════════
 applyTheme(theme());render();
+
+// ─ Service Worker（自動更新）
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js');
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!refreshing){refreshing=true;location.reload();}
+  });
+}
 </script>
 </body>
 </html>
