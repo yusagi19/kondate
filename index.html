@@ -383,6 +383,13 @@ function fmtNum(n){
   for(const[v,s]of halves){if(Math.abs(frac-v)<0.01){return whole?`${whole}と${s}`:s;}}
   return String(Math.round(r*10)/10);
 }
+function scaleAmt(s,ratio){
+  if(!s||ratio===1)return s;
+  const p=parseAmt(cleanAmt(s));
+  if(!p||!p.num)return s; // 「少々」「適量」など数値なし→そのまま
+  const scaled=p.num*ratio;
+  return p.style==='tbs'?`${p.pre}${fmtNum(scaled)}`:`${fmtNum(scaled)}${p.unit}`;
+}
 function mergeAmts(arr){
   if(!arr.length)return'';
   if(arr.length===1)return cleanAmt(arr[0]);
@@ -832,16 +839,18 @@ function vShop(){
   const chk=S.data.checked[wk]||{},del=S.data.deleted[wk]||{};
   const manual=S.data.manualItems[wk]||[];
 
-  // Aggregate ingredients with combined amounts (apply NORMALIZE for dedup)
+  // Aggregate ingredients with combined amounts (apply NORMALIZE + serving scale)
+  const targetSrv=getServings();
   const ings={};
   Object.values(plan).forEach(dp=>{
     Object.values(dp).forEach(rid=>{
       const r=rec(rid);if(!r)return;
+      const ratio=targetSrv/(r.baseServings||2);
       (r.ingredients||[]).forEach(s=>{
         const{name:rawName,amount}=parseIngredient(s);if(!rawName)return;
         const name=NORMALIZE[rawName]||rawName;
         if(!ings[name])ings[name]=[];
-        if(amount)ings[name].push(amount);
+        if(amount)ings[name].push(ratio===1?amount:scaleAmt(amount,ratio));
       });
     });
   });
@@ -1103,7 +1112,7 @@ function saveRF(eid){
   const steps=S.rf.steps.filter(s=>s.trim());
   const photo=S.rf.photo||null;
   if(eid){const idx=S.data.recipes.findIndex(r=>r.id===eid);if(idx!==-1)S.data.recipes[idx]={...S.data.recipes[idx],name,type,url,photo,ingredients,steps};}
-  else S.data.recipes.push({id:'r'+uid(),name,type,url,photo,ingredients,steps});
+  else S.data.recipes.push({id:'r'+uid(),name,type,url,photo,ingredients,steps,baseServings:getServings()});
   save();closeM();render();toast(eid?'更新しました':'追加しました');
 }
 
@@ -1208,7 +1217,8 @@ typeは「主菜」「副菜」「ご飯」「スープ」のいずれか。`;
       if(!TYPES.includes(r.type))return;
       S.data.recipes.push({id:'r'+uid(),name,type:r.type,url:'',photo:null,
         ingredients:(r.ingredients||[]).filter(s=>s.trim()),
-        steps:(r.steps||[]).filter(s=>s.trim())});
+        steps:(r.steps||[]).filter(s=>s.trim()),
+        baseServings:getServings()});
       existingSet.add(name);
       added++;
     });
