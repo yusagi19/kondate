@@ -267,8 +267,10 @@ textarea.fc{min-height:80px;resize:vertical}
 
 <script>
 // ═══ CONSTANTS ════════════════════════════════════════════════
-const SK='kondate_v1', AKS='claude_api_key', THS='theme_color';
+const SK='kondate_v1', AKS='claude_api_key', THS='theme_color', SVS='kondate_servings';
 const MODEL='claude-haiku-4-5-20251001';
+function getServings(){return parseInt(localStorage.getItem(SVS)||'2');}
+function setServings(n){localStorage.setItem(SVS,String(n));render();toast(n+'人分に変更しました');}
 const API='https://api.anthropic.com/v1/messages';
 
 const SLOTS=[
@@ -805,7 +807,7 @@ async function ocrImage(file){
     });
     const msg={role:'user',content:[
       {type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},
-      {type:'text',text:`このレシピ画像を読み取り、以下のJSONのみで返してください:
+      {type:'text',text:`このレシピ画像を読み取り、${getServings()}人分として以下のJSONのみで返してください:
 {"name":"料理名","type":"主菜|副菜|ご飯|スープ","ingredients":["食材名 ... 分量"],"steps":["手順テキスト"]}
 typeは必ず主菜/副菜/ご飯/スープのいずれかにしてください。JSONのみ返してください。`}
     ]};
@@ -863,7 +865,7 @@ function vShop(){
   const done=Object.values(chk).filter(Boolean).length;
 
   let h=`<div class="shop-top">
-    <h2>🛒 買い物リスト</h2>
+    <h2>🛒 買い物リスト <span style="font-size:12px;font-weight:normal;color:var(--t2)">${getServings()}人分</span></h2>
     <div class="shop-top-r">
       <span class="progress-text">${done}/${total}</span>
       <button class="btn-out" style="font-size:11px;padding:4px 8px" onclick="resetChk('${wk}')">リセット</button>
@@ -991,7 +993,7 @@ function openDet(rid){
     ${r.url?`<a href="${r.url}" target="_blank" class="url-chip">🔗 URL</a>`:''}
   </div>`;
   if(r.ingredients?.length){
-    h+=`<h4 style="font-size:13px;margin-bottom:6px">材料（2人分）</h4>
+    h+=`<h4 style="font-size:13px;margin-bottom:6px">材料（${getServings()}人分）</h4>
     <ul class="ing-list-d">${r.ingredients.map(s=>{
       const{name,amount}=parseIng(s);
       return`<li><span class="ing-n">${name}</span>${amount?`<span class="ing-a">${amount}</span>`:''}</li>`;
@@ -1040,7 +1042,7 @@ function openRF(rid,defType='主菜'){
   <div class="fg"><label>参考URL</label>
     <input class="fc" type="url" id="rf-u" value="${esc(u)}" placeholder="https://..."></div>
   <div class="fg"><label>料理写真（料理の仕上がり写真）</label>${rfPhoto()}</div>
-  <div class="fg"><label>材料（2人分）</label>
+  <div class="fg"><label>材料（${getServings()}人分）</label>
     <ul class="ing-rows" id="ing-rows">${S.rf.ingredients.map((v,i)=>ingRow(i,v)).join('')}</ul>
     <button class="btn-sm" onclick="addIng()">＋ 材料追加</button></div>
   <div class="fg"><label>作り方</label>
@@ -1125,6 +1127,14 @@ function vSettings(){
     <button class="btn" onclick="saveAK()">保存</button>
     <p style="margin-top:7px;font-size:11px;color:var(--t2)">localStorageに保存されます。共有しないでください。</p>
   </div>
+  <div class="sec"><h3>👨‍👩‍👧 人数設定</h3>
+    <div class="fg"><label>何人分で献立を管理しますか？</label>
+      <select class="fc" onchange="setServings(this.value)" style="width:auto">
+        ${[1,2,3,4,5,6].map(n=>`<option value="${n}"${getServings()===n?' selected':''}>${n}人分</option>`).join('')}
+      </select>
+    </div>
+    <p style="font-size:11px;color:var(--t2)">レシピの材料欄と買い物リストに反映されます</p>
+  </div>
   <div class="sec"><h3>🎨 カラーテーマ</h3>
     <div class="swatches">${THEMES.map(t=>`<div class="sw${t.v===th.v?' active':''}" style="background:${t.v}" title="${t.n}" onclick="setTheme('${t.v}')"></div>`).join('')}</div>
     <p style="font-size:11px;color:var(--t2)">現在: ${th.n}</p>
@@ -1171,7 +1181,7 @@ async function aiGenerateRecipes(){
   try{
     const existingNames=S.data.recipes.map(r=>r.name);
     const existingSet=new Set(existingNames.map(n=>n.trim()));
-    const prompt=`日本の定番家庭料理レシピを10品、2人分で生成してください。
+    const prompt=`日本の定番家庭料理レシピを10品、${getServings()}人分で生成してください。
 主菜3品・副菜3品・ご飯2品・スープ2品のバランスで作成してください。
 
 既存レシピ（重複させないでください）: ${existingNames.join('、')||'なし'}
@@ -1215,6 +1225,7 @@ function showSyncExport(){
     [SK]:JSON.stringify(S.data),
     [AKS]:localStorage.getItem(AKS)||'',
     [THS]:localStorage.getItem(THS)||'',
+    [SVS]:localStorage.getItem(SVS)||'2',
   });
   const b64=btoa(unescape(encodeURIComponent(payload)));
   openM(`<div class="mhdr"><span class="mtitle">📤 同期テキスト</span><button class="mclose" onclick="closeM()">✕</button></div>
@@ -1237,6 +1248,7 @@ function syncImport(){
       localStorage.setItem(SK,payload[SK]);
       if(payload[AKS])localStorage.setItem(AKS,payload[AKS]);
       if(payload[THS])localStorage.setItem(THS,payload[THS]);
+      if(payload[SVS])localStorage.setItem(SVS,payload[SVS]);
       S.data={...defData(),...JSON.parse(payload[SK])};
     }else if(payload.data?.recipes){
       S.data={...defData(),...payload.data};
@@ -1254,6 +1266,7 @@ function exportJSON(){
     [SK]:JSON.stringify(S.data),
     [AKS]:localStorage.getItem(AKS)||'',
     [THS]:localStorage.getItem(THS)||'',
+    [SVS]:localStorage.getItem(SVS)||'2',
     exportedAt:new Date().toISOString(),
   };
   const b=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
